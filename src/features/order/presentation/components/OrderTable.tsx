@@ -1,6 +1,7 @@
 import { Order } from '../../domain/order.entity';
 import { Badge } from '@/src/shared/ui/badge';
 import { cn } from '@/src/shared/lib/utils';
+import Link from 'next/link';
 
 interface OrderTableProps {
     orders: Order[];
@@ -64,9 +65,9 @@ export function OrderTable({ orders }: OrderTableProps) {
                                 <input type="checkbox" className="rounded-lg border-slate-200 bg-white focus:ring-blue-500/20 text-blue-600 h-4 w-4 cursor-pointer" />
                             </td>
                             <td className="px-6 py-5 text-center">
-                                <span className="font-black text-blue-600 text-xs tracking-tighter hover:underline cursor-pointer">
+                                <Link href={`/orders/${order.orderNumber}`} className="font-black text-blue-600 text-xs tracking-tighter hover:underline">
                                     {order.orderNumber}
-                                </span>
+                                </Link>
                             </td>
                             <td className="px-6 py-5 text-center">
                                 <div className="font-black text-[#0F172A] tracking-tight text-xs">{order.customerName}</div>
@@ -92,9 +93,12 @@ export function OrderTable({ orders }: OrderTableProps) {
                                 </Badge>
                             </td>
                             <td className="px-6 py-5 text-center">
-                                <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-slate-200 hover:border-blue-200 bg-white shadow-sm">
+                                <Link
+                                    href={`/orders/${order.orderNumber}`}
+                                    className="inline-block p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-slate-200 hover:border-blue-200 bg-white shadow-sm"
+                                >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                </button>
+                                </Link>
                             </td>
                         </tr>
                     ))}

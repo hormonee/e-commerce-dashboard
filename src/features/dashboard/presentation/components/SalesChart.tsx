@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface SalesChartProps {
@@ -11,6 +11,12 @@ interface SalesChartProps {
 }
 
 export function SalesChart({ data, goalAmount, currentAmount, achievementRate }: SalesChartProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     // Format YAxis labels (e.g. 5,000,000 -> 5M for simplicity or keep raw)
     const formatYAxis = (tickItem: number) => {
         if (tickItem === 0) return '0';
@@ -25,6 +31,10 @@ export function SalesChart({ data, goalAmount, currentAmount, achievementRate }:
             amount: d.amount
         };
     });
+
+    if (!mounted) {
+        return <div className="bg-white border border-slate-200 rounded-3xl p-8 col-span-2 shadow-sm h-[400px] animate-pulse" />;
+    }
 
     return (
         <div className="bg-white border border-slate-200 rounded-3xl p-8 col-span-2 shadow-sm h-full">
@@ -46,7 +56,7 @@ export function SalesChart({ data, goalAmount, currentAmount, achievementRate }:
                 </div>
             </div>
 
-            <div className="h-[220px] w-full mb-10">
+            <div className="h-[220px] w-full mb-10 min-h-[0] min-w-[0]">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
                         <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} fontWeight={700} tickLine={false} axisLine={false} tickMargin={12} />

@@ -7,32 +7,32 @@ interface KPICardsListProps {
 }
 
 export function KPICardsList({ metrics }: KPICardsListProps) {
-    const formatCurrency = (value: number) => `₩${value.toLocaleString()}`;
-    const formatGrowth = (value: number) => `${value > 0 ? '+' : ''}${value}%`;
+    const formatCurrency = (value: number) => `₩${(value ?? 0).toLocaleString()}`;
+    const formatGrowth = (value: number) => `${(value ?? 0) > 0 ? '+' : ''}${(value ?? 0)}%`;
 
     const kpiItems = [
         {
             title: "총 거래액 (GMV)",
-            value: formatCurrency(metrics.totalRevenue),
-            growth: metrics.revenueGrowthRate,
+            value: formatCurrency(metrics?.totalRevenue),
+            growth: metrics?.revenueGrowthRate,
             description: "전월 대비 ₩14.2M 증가", // 하드코딩된 mock description based on image
         },
         {
             title: "순매출액",
-            value: formatCurrency(metrics.netRevenue),
-            growth: metrics.netRevenueGrowthRate,
+            value: formatCurrency(metrics?.netRevenue),
+            growth: metrics?.netRevenueGrowthRate,
             description: "반품/취소 제외 금액",
         },
         {
             title: "주문 수",
-            value: `${metrics.orderCount.toLocaleString()}건`,
-            growth: metrics.orderCountGrowthRate,
+            value: `${(metrics?.orderCount ?? 0).toLocaleString()}건`,
+            growth: metrics?.orderCountGrowthRate,
             description: "일평균 177건 발생",
         },
         {
             title: "평균 주문 금액 (AOV)",
-            value: formatCurrency(metrics.averageOrderValue),
-            growth: metrics.aovGrowthRate,
+            value: formatCurrency(metrics?.averageOrderValue),
+            growth: metrics?.aovGrowthRate,
             description: "장바구니 객단가 상승",
         },
     ];

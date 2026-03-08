@@ -125,7 +125,21 @@ CREATE TABLE public.customer_notes (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 10. auth.users 생성을 감지하여 public.users에 자동 추가하는 트리거 설정
+-- 10.5 기존 정책 및 함수 일괄 삭제 (재설정용)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $$;
+
+-- 10.6 유저 핸들러 재정의 (안전성을 위해 SECURITY DEFINER 유지)
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
@@ -134,7 +148,7 @@ BEGIN
     new.id, 
     new.email, 
     COALESCE(new.raw_user_meta_data->>'full_name', ''), 
-    'CUSTOMER', 
+    COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'), 
     'NEW'
   );
   RETURN new;
@@ -145,7 +159,18 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- 11. 행 레벨 보안 (RLS) 정책 설정
+-- 10.5 기존 정책 및 함수 일괄 삭제 (재설정용)
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $$;
+
+-- 11. 행 레벨 보안 (RLS) 정책 설정 (최종 안정화 버전: 무한 재귀 배제)
 
 -- 모든 테이블 RLS 활성화
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -158,52 +183,75 @@ ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_notes ENABLE ROW LEVEL SECURITY;
 
--- 관리자(ADMIN)를 위한 전역 접근 정책 (모든 테이블)
--- public.users에서 role을 확인하여 ADMIN인 경우 모든 행위 허용
+-- 기존 정책 일괄 삭제
 DO $$
 DECLARE
-  table_name TEXT;
+  r RECORD;
 BEGIN
-  FOR table_name IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public')
   LOOP
-    EXECUTE format('CREATE POLICY "Admins have full access on %I" ON public.%I FOR ALL USING (
-      EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = ''ADMIN'')
-    );', table_name, table_name);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
   END LOOP;
 END $$;
 
--- 고객(CUSTOMER)을 위한 개별 정책
+-- [관리자 정책] JWT role이 ADMIN이거나 특정 이메일인 경우 모든 권한 허용
+-- users 테이블을 포함한 모든 테이블에 대해 적용 (서브쿼리 없음)
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('CREATE POLICY "admin_all_%I" ON public.%I FOR ALL USING (
+      (auth.jwt() -> ''user_metadata'' ->> ''role'') = ''ADMIN'' 
+      OR (auth.jwt() ->> ''email'') = ''admin@admin.com''
+    );', t, t);
+  END LOOP;
+END $$;
 
--- users: 자신의 정보 조회 및 수정 가능
-CREATE POLICY "Users can view and update their own record" ON public.users FOR ALL USING (
-  id = auth.uid()
+-- [고객 및 공개 정책]
+-- users: 본인만 접근
+CREATE POLICY "users_customer" ON public.users FOR ALL USING (id = auth.uid());
+
+-- products: 공개 조회
+CREATE POLICY "products_public" ON public.products FOR SELECT USING (status != 'HIDDEN');
+CREATE POLICY "product_images_public" ON public.product_images FOR SELECT USING (true);
+CREATE POLICY "product_variants_public" ON public.product_variants FOR SELECT USING (true);
+
+-- orders: 본인 주문만 조회/생성
+CREATE POLICY "orders_customer" ON public.orders FOR SELECT USING (customer_id = auth.uid());
+CREATE POLICY "orders_insert" ON public.orders FOR INSERT WITH CHECK (customer_id = auth.uid());
+
+-- order_items: 본인 주문의 아이템만 조회 (단방향 체크)
+CREATE POLICY "order_items_customer" ON public.order_items FOR SELECT USING (
+  order_id IN (SELECT id FROM public.orders WHERE customer_id = auth.uid())
 );
 
--- products: 판매 중인 상품 조회 가능
-CREATE POLICY "Anyone can view products on sale" ON public.products FOR SELECT USING (
-  status = 'ON_SALE'
-);
+-------------------------------
+-- 1. 모든 테이블의 기존 정책 강제 삭제
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $$;
 
--- product_images: 조회 가능
-CREATE POLICY "Anyone can view product images" ON public.product_images FOR SELECT USING (true);
+-- 2. 관리자 정책 (JWT 기반 - 테이블 조회 없음)
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('CREATE POLICY "admin_access_all_%I" ON public.%I FOR ALL USING (
+      (auth.jwt() -> ''user_metadata'' ->> ''role'') = ''ADMIN'' 
+      OR (auth.jwt() ->> ''email'') = ''admin@admin.com''
+    );', t, t);
+  END LOOP;
+END $$;
 
--- product_variants: 활성화된 옵션 조회 가능
-CREATE POLICY "Anyone can view active variants" ON public.product_variants FOR SELECT USING (is_active = true);
-
--- orders: 자신의 주문 조회 및 생성 가능
-CREATE POLICY "Customers can view their own orders" ON public.orders FOR SELECT USING (
-  customer_id = auth.uid()
-);
-CREATE POLICY "Customers can create their own orders" ON public.orders FOR INSERT WITH CHECK (
-  customer_id = auth.uid()
-);
-
--- order_items: 자신의 주문 상품 조회 가능
-CREATE POLICY "Customers can view their own order items" ON public.order_items FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.orders WHERE id = order_id AND customer_id = auth.uid())
-);
-
--- order_history: 자신의 주문 이력 조회 가능
-CREATE POLICY "Customers can view their own order history" ON public.order_history FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.orders WHERE id = order_id AND customer_id = auth.uid())
-);
+-- 3. 유저 자신의 데이터 접근 허용
+CREATE POLICY "users_self_view" ON public.users FOR SELECT USING (id = auth.uid());

@@ -1,4 +1,4 @@
-import { Order, OrderSummary } from './order.entity';
+import { Order, OrderSummary, OrderDetail, OrderStatus } from './order.entity';
 
 export interface GetOrdersParams {
     startDate?: string;
@@ -20,4 +20,6 @@ export interface GetOrdersResponse {
 
 export interface OrderRepository {
     getOrders(params: GetOrdersParams): Promise<GetOrdersResponse>;
+    getOrderDetail(orderId: string): Promise<OrderDetail>;
+    updateOrderStatus(orderId: string, status: OrderStatus): Promise<boolean>;
 }

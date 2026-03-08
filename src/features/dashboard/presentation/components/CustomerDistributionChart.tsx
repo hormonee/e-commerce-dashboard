@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { CustomerDistribution } from '../../domain/entities/dashboard-stats.entity';
 
@@ -9,10 +9,19 @@ interface CustomerDistributionChartProps {
 }
 
 export function CustomerDistributionChart({ data }: CustomerDistributionChartProps) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const chartData = [
         { name: '재방문/재구매 고객', value: data.repurchaseCount, color: '#2563eb' },
         { name: '신규 방문 고객', value: data.newVisitorCount, color: '#94a3b8' },
     ];
+
+    if (!mounted) {
+        return <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm h-[400px] animate-pulse" />;
+    }
 
     return (
         <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col h-full">

@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { PaymentMethodShare } from "../../domain/entities/sales.entity";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -8,6 +9,15 @@ interface PaymentMethodChartProps {
 }
 
 export function PaymentMethodChart({ data }: PaymentMethodChartProps) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm h-[460px] animate-pulse" />;
+    }
+
     const COLORS = ["#3B82F6", "#10B981", "#FAB005", "#94A3B8"];
 
     const labels: Record<string, string> = {

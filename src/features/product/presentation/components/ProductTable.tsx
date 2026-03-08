@@ -8,7 +8,7 @@ import { cn } from "../../../../shared/lib/utils";
 
 interface ProductTableProps {
     products: Product[];
-    onDelete: (id: string) => Promise<void>;
+    onDelete: (id: string) => Promise<any>;
 }
 
 export function ProductTable({ products, onDelete }: ProductTableProps) {
