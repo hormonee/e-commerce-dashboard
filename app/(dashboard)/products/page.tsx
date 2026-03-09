@@ -1,27 +1,51 @@
-"use client";
-
 import { ProductHeader } from "@/src/features/product/presentation/components/ProductHeader";
 import { ProductFilters } from "@/src/features/product/presentation/components/ProductFilters";
 import { ProductTable } from "@/src/features/product/presentation/components/ProductTable";
 import { Pagination } from "@/src/features/product/presentation/components/Pagination";
 import { Suspense } from "react";
+import { SupabaseProductRepository } from "@/src/features/product/infrastructure/supabase-product.repository";
+import { ProductCategory } from "@/src/features/product/domain/entities/product.entity";
+import { deleteProductAction } from "@/src/features/product/presentation/actions/delete-product.action";
 
-// Mock Data
-const mockProducts = [
-    { id: '1', name: '프리미엄 무선 헤드셋', category: { large: '전자기기' }, price: { final: 299000 }, stockCount: 45, status: 'IN_STOCK', sku: 'HD-001' },
-    { id: '2', name: '기계식 게이밍 키보드', category: { large: '전자기기' }, price: { final: 159000 }, stockCount: 12, status: 'LOW_STOCK', sku: 'KB-002' },
-];
+const productRepository = new SupabaseProductRepository();
 
-export default function ProductsPage() {
+interface ProductsPageProps {
+    searchParams: Promise<{
+        category?: string;
+        page?: string;
+        search?: string;
+    }>;
+}
+
+export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+    const params = await searchParams;
+    const category = (params.category as ProductCategory) || "전체";
+    const page = Number(params.page) || 1;
+    const search = params.search || "";
+
+    const { items, totalCount, totalPages } = await productRepository.getProducts({
+        category,
+        page,
+        pageSize: 10,
+        search
+    });
+
     return (
         <Suspense fallback={<div>로딩 중...</div>}>
             <div className="space-y-6">
                 <ProductHeader />
                 <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                    <ProductFilters currentCategory="전체" />
-                    <ProductTable products={mockProducts as any} onDelete={async () => { }} />
+                    <ProductFilters currentCategory={category} />
+                    <ProductTable
+                        products={items}
+                        onDelete={deleteProductAction}
+                    />
                     <div className="p-6 border-t border-slate-100 bg-slate-50/30">
-                        <Pagination currentPage={1} totalPages={10} totalCount={100} />
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalCount={totalCount}
+                        />
                     </div>
                 </div>
             </div>

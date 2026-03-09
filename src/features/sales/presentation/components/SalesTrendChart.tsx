@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { SalesTrend } from "../../domain/entities/sales.entity";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
@@ -8,8 +9,15 @@ interface SalesTrendChartProps {
 }
 
 export function SalesTrendChart({ trends }: SalesTrendChartProps) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     // Find the max revenue to highlight the highest bar
-    const maxRevenue = Math.max(...trends.map(t => t.revenue));
+    const maxRevenue = (trends && trends.length > 0)
+        ? Math.max(...trends.map(t => t.revenue ?? 0))
+        : 0;
 
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
@@ -17,13 +25,17 @@ export function SalesTrendChart({ trends }: SalesTrendChartProps) {
                 <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-xl text-[11px]">
                     <p className="font-extrabold text-slate-400 mb-1 uppercase tracking-tighter">{label}</p>
                     <p className="text-blue-600 font-extrabold text-sm tracking-tight">
-                        ₩{payload[0].value.toLocaleString()}
+                        ₩{(payload[0].value ?? 0).toLocaleString()}
                     </p>
                 </div>
             );
         }
         return null;
     };
+
+    if (!mounted) {
+        return <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm h-[460px] animate-pulse" />;
+    }
 
     return (
         <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm h-full min-h-[460px] flex flex-col">
