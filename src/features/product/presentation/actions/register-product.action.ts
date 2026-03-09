@@ -46,10 +46,10 @@ export async function registerProductAction(data: ProductRegistrationData) {
         });
 
         revalidatePath('/products');
+        return { success: true };
+      
     } catch (error: any) {
         console.error('Failed to register product:', error);
         return { error: '상품 등록에 실패했습니다. 관리자에게 문의하세요.' };
     }
-
-    redirect('/products');
 }

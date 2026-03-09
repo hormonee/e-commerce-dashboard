@@ -43,16 +43,16 @@ export function ProductRegistrationForm() {
             name: '',
             promotionText: '',
             category: { large: '', medium: '', small: '' },
-            price: { regular: 0, discountRate: 0, final: 0 },
-            stockCount: 0,
-            purchaseLimit: 0,
+            price: { regular: undefined, discountRate: undefined, final: undefined },
+            stockCount: undefined,
+            purchaseLimit: undefined,
             mainImageUrl: '',
             additionalImageUrls: [] as string[],
             options: [] as { name: string; values: string[] }[],
             description: '',
-            shipping: { type: 'FREE', fee: 0, method: '', originAddress: '', isBundleAvailable: true },
+            shipping: { type: 'FREE', fee: undefined, method: '', originAddress: '', isBundleAvailable: true },
             seo: { metaTitle: '', metaDescription: '', tags: [] as string[] },
-        } as ProductRegistrationData,
+        } as unknown as ProductRegistrationData,
         onSubmit: async ({ value }: { value: ProductRegistrationData }) => {
             try {
                 let mainImageUrl = value.mainImageUrl;
@@ -88,7 +88,11 @@ export function ProductRegistrationForm() {
 
                 if (result?.error) {
                     alert(result.error);
+                    return;
                 }
+
+                alert('상품이 성공적으로 등록되었습니다.');
+                window.location.href = '/products';
             } catch (error: any) {
                 console.error('Submit error:', error);
                 alert(error.message || '상품 등록 중 오류가 발생했습니다.');
@@ -97,10 +101,18 @@ export function ProductRegistrationForm() {
     });
 
     const FieldInfo = ({ field }: { field: any }) => {
-        const errors = field.state.meta.errors;
         const errorMap = field.state.meta.errorMap;
-        // errorMap(현재 유효성 검사 결과)를 우선시하여, 입력 중인 상태를 즉각 반영함
-        const displayError = errorMap?.onChange || errorMap?.onBlur || errors?.[0];
+        const value = field.state.value;
+        const hasContent = value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0);
+
+        // 1. 실시간 에러(onChange, onBlur)는 무조건 표시
+        let displayError = errorMap?.onChange || errorMap?.onBlur;
+
+        // 2. 실시간 에러가 없고 제출 에러(onSubmit)가 있는 경우, 
+        //    값이 비어있는 경우에만 표시함 (이미 채워졌다면 onSubmit은 stale한 것으로 간주)
+        if (!displayError && errorMap?.onSubmit && !hasContent) {
+            displayError = errorMap.onSubmit;
+        }
 
         return (
             <>
@@ -121,6 +133,17 @@ export function ProductRegistrationForm() {
                 e.preventDefault();
                 e.stopPropagation();
                 form.handleSubmit();
+            }}
+            onKeyDown={(e) => {
+                // Input이나 Select에서 Enter키를 눌렀을 때 폼이 제출되는 것을 방지
+                if (e.key === 'Enter') {
+                    const target = e.target as HTMLElement;
+                    const isTextArea = target.tagName === 'TEXTAREA';
+                    // 옵션값 입력 등 개별적으로 Enter를 처리하는 경우를 제외하고 방지
+                    if (!isTextArea && !target.hasAttribute('data-allow-enter')) {
+                        e.preventDefault();
+                    }
+                }
             }}
             className="space-y-8 pb-20"
         >
@@ -311,6 +334,7 @@ export function ProductRegistrationForm() {
                         validators={{
                             onChange: ({ value }) => (value < 1 ? '정상가는 1원 이상이어야 합니다' : undefined),
                             onBlur: ({ value }) => (value < 1 ? '정상가는 1원 이상이어야 합니다' : undefined),
+                            onSubmit: ({ value }) => (value < 1 || !value ? '정상가를 입력해주세요.' : undefined),
                         }}
                         children={(field) => (
                             <div className="space-y-2">
@@ -320,16 +344,18 @@ export function ProductRegistrationForm() {
                                         type="number"
                                         id={field.name}
                                         name={field.name}
-                                        value={field.state.value}
+                                        value={field.state.value ?? ''}
                                         onBlur={field.handleBlur}
+                                        placeholder="0"
                                         onChange={(e) => {
-                                            const val = Number(e.target.value);
-                                            const safeVal = isNaN(val) ? 0 : val;
-                                            field.handleChange(safeVal);
+                                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                            const safeVal = (val === undefined || isNaN(val)) ? undefined : val;
+                                            field.handleChange(safeVal as any);
                                             // 최종 판매가 자동 계산
                                             const priceData = form.getFieldValue('price') as any;
+                                            const regular = safeVal || 0;
                                             const discount = priceData?.discountRate || 0;
-                                            form.setFieldValue('price.final', Math.round(safeVal * (1 - discount / 100)));
+                                            form.setFieldValue('price.final', Math.round(regular * (1 - discount / 100)));
                                         }}
                                         className="h-12 rounded-xl bg-slate-50/50 border-slate-200 pr-10 font-black"
                                     />
@@ -349,16 +375,18 @@ export function ProductRegistrationForm() {
                                         type="number"
                                         id={field.name}
                                         name={field.name}
-                                        value={field.state.value}
+                                        value={field.state.value ?? ''}
                                         onBlur={field.handleBlur}
+                                        placeholder="0"
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            const val = Number(e.target.value);
-                                            const safeVal = isNaN(val) ? 0 : val;
-                                            field.handleChange(safeVal);
+                                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                            const safeVal = (val === undefined || isNaN(val)) ? undefined : val;
+                                            field.handleChange(safeVal as any);
                                             // 최종 판매가 자동 계산
                                             const priceData = form.getFieldValue('price') as any;
                                             const regular = priceData?.regular || 0;
-                                            form.setFieldValue('price.final', Math.round(regular * (1 - safeVal / 100)));
+                                            const discount = safeVal || 0;
+                                            form.setFieldValue('price.final', Math.round(regular * (1 - discount / 100)));
                                         }}
                                         className="h-12 rounded-xl bg-slate-50/50 border-slate-200 pr-10 font-black"
                                     />
@@ -378,8 +406,9 @@ export function ProductRegistrationForm() {
                                         type="number"
                                         id={field.name}
                                         name={field.name}
-                                        value={field.state.value}
+                                        value={field.state.value ?? ''}
                                         readOnly
+                                        placeholder="0"
                                         className="h-12 rounded-xl bg-blue-50/30 border-blue-100 pr-10 font-black text-blue-600"
                                     />
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 font-bold text-xs">원</span>
@@ -407,9 +436,13 @@ export function ProductRegistrationForm() {
                                         type="number"
                                         id={field.name}
                                         name={field.name}
-                                        value={field.state.value}
+                                        value={field.state.value ?? ''}
                                         onBlur={field.handleBlur}
-                                        onChange={(e) => field.handleChange(e.target.valueAsNumber || 0)}
+                                        placeholder="0"
+                                        onChange={(e) => {
+                                            const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                            field.handleChange((val === undefined || isNaN(val)) ? undefined : val as any);
+                                        }}
                                         className="h-12 rounded-xl bg-slate-50/50 border-slate-200 pr-10 font-black"
                                     />
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">개</span>
@@ -439,6 +472,10 @@ export function ProductRegistrationForm() {
                                 return result.success ? undefined : result.error.errors[0].message;
                             },
                             onBlur: ({ value }) => {
+                                const result = productRegistrationSchema.shape.mainImageUrl.safeParse(value);
+                                return result.success ? undefined : result.error.errors[0].message;
+                            },
+                            onSubmit: ({ value }) => {
                                 const result = productRegistrationSchema.shape.mainImageUrl.safeParse(value);
                                 return result.success ? undefined : result.error.errors[0].message;
                             }
@@ -684,6 +721,7 @@ export function ProductRegistrationForm() {
                                                             <Input
                                                                 placeholder="예: 블랙, 화이트 (입력 후 Enter)"
                                                                 className="h-11 rounded-xl bg-white border-slate-200 text-sm font-bold"
+                                                                data-allow-enter
                                                                 onKeyDown={(e) => {
                                                                     if (e.key === 'Enter') {
                                                                         e.preventDefault();
@@ -836,9 +874,13 @@ export function ProductRegistrationForm() {
                                                 type="number"
                                                 id={field.name}
                                                 name={field.name}
-                                                value={field.state.value}
+                                                value={field.state.value ?? ''}
                                                 onBlur={field.handleBlur}
-                                                onChange={(e) => field.handleChange(e.target.valueAsNumber || 0)}
+                                                placeholder="0"
+                                                onChange={(e) => {
+                                                    const val = e.target.value === '' ? undefined : Number(e.target.value);
+                                                    field.handleChange((val === undefined || isNaN(val)) ? undefined : val as any);
+                                                }}
                                                 disabled={shippingType === 'FREE'}
                                                 className="h-12 rounded-xl bg-slate-50/50 border-slate-200 pr-10 font-bold"
                                             />
